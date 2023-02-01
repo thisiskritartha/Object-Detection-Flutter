@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const MyHomePage());
@@ -26,10 +29,14 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     imagePicker = ImagePicker();
 
-    const mode = DetectionMode.single;
-    final options = ObjectDetectorOptions(
-        mode: mode, classifyObjects: true, multipleObjects: true);
-    objectDetector = ObjectDetector(options: options);
+    //For the base model of object_detection
+    // const mode = DetectionMode.single;
+    // final options = ObjectDetectorOptions(
+    //     mode: mode, classifyObjects: true, multipleObjects: true);
+    // objectDetector = ObjectDetector(options: options);
+
+    //For the custom model of object_detection
+    createObjectDetection();
   }
 
   @override
@@ -55,12 +62,38 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  createObjectDetection() async {
+    final modelPath = await _getModel('assets/ml/mobilenet.tflite');
+    final options = LocalObjectDetectorOptions(
+      modelPath: modelPath,
+      classifyObjects: true,
+      multipleObjects: true,
+      mode: DetectionMode.single,
+    );
+    objectDetector = ObjectDetector(options: options);
+  }
+
+  Future<String> _getModel(String assetPath) async {
+    if (Platform.isAndroid) {
+      return 'flutter_assets/$assetPath';
+    }
+    final path = '${(await getApplicationSupportDirectory()).path}/$assetPath';
+    await Directory(dirname(path)).create(recursive: true);
+    final file = File(path);
+    if (!await file.exists()) {
+      final byteData = await rootBundle.load(assetPath);
+      await file.writeAsBytes(byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+    }
+    return file.path;
+  }
+
   doObjectDetection() async {
     InputImage inputImage = InputImage.fromFile(img!);
     objects = await objectDetector.processImage(inputImage);
     for (DetectedObject detectedObjects in objects) {
-      final Rect rect = detectedObjects.boundingBox;
-      final trackingId = detectedObjects.trackingId;
+      //final Rect rect = detectedObjects.boundingBox;
+      //final trackingId = detectedObjects.trackingId;
 
       for (Label label in detectedObjects.labels) {
         print('${label.text}: ${label.confidence} 💥💥');
@@ -108,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         onPressed: imgFromGallery,
                         onLongPress: imgFromCamera,
                         style: ElevatedButton.styleFrom(
-                          primary: Colors.transparent,
+                          backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
                         ),
                         child: Container(
